@@ -1,0 +1,11 @@
+# macOS junk (this drive creates AppleDouble files on every copy)
+.DS_Store
+._*
+
+# node (exporter + tooling)
+node_modules/
+package-lock.json
+
+# exporter output
+exports/
+.frames/

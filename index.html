@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Faux Reel — a sizzle reel with no video in it</title>
+<meta name="description" content="Load stills, pull a palette from their pixels, add a title. The reel cuts itself into motion. No video files, runs in your browser." />
+<script src="sizzle-reel.js"></script>
+<style>
+  :root {
+    --bg: #F3F0ED;
+    --surface: #FFFFFF;
+    --surface-alt: #EDE9E3;
+    --fg: #1A1A1A;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    /* faint graph-paper, only on the page behind the panels */
+    background-image:
+      linear-gradient(rgba(26,26,26,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,26,26,0.035) 1px, transparent 1px);
+    background-size: 40px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vw, 56px);
+  }
+  .app { width: 100%; max-width: 1240px; position: relative; z-index: 2; }
+
+  /* ── background reel field ──
+     the whole page becomes a wall of tiny reels, each cutting on its own
+     offset and speed. The solid panels sit on top; the chaos lives in the
+     gutters around them. Fades in on open. Hidden for reduced-motion. */
+  .bg-reels {
+    position: fixed; inset: -64px; z-index: 0;   /* expand past the viewport so tiles bleed off every edge */
+    display: grid;
+    justify-content: space-between; align-content: space-between;
+    gap: 40px;                                    /* no padding — the field runs off the screen */
+    overflow: hidden; pointer-events: none;
+    opacity: 0; transform: scale(1.02);
+    transition: opacity .7s ease, transform 1.3s cubic-bezier(.2,.7,.2,1);
+  }
+  .bg-reels.in { opacity: 1; transform: scale(1); }
+  .bg-reels sizzle-reel { width: 100%; }
+  /* knock the field back so the panels stay the focus, not the noise */
+  .bg-scrim {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: rgba(243,240,237,0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bg-reels, .bg-scrim { display: none; }
+  }
+
+  .panels { display: grid; gap: 20px; }
+  @media (min-width: 900px) {
+    .panels { grid-template-columns: 340px minmax(0, 1fr); align-items: start; }
+    .rail  { grid-column: 1; grid-row: 1; }
+    .stage { grid-column: 2; grid-row: 1; }
+  }
+
+  /* ── rail ── */
+  .rail { background: var(--surface); border-radius: 24px; padding: 28px; order: 2; }
+  @media (min-width: 900px) { .rail { order: 0; } }
+  .rail-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .rail-head h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+  .tag, .label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(26,26,26,0.45); }
+  .lede { margin-top: 12px; max-width: 34ch; font-size: 12px; line-height: 1.55; color: rgba(26,26,26,0.55); }
+  .ctl { margin-top: 20px; border-top: 1px solid rgba(26,26,26,0.10); padding-top: 20px; }
+  .ctl .label { display: block; margin-bottom: 12px; }
+  .ctl .label b { font-weight: 700; color: rgba(26,26,26,0.7); }
+  .ctl .label .dash { margin: 0 6px; color: rgba(26,26,26,0.25); }
+  .note { font-size: 11px; letter-spacing: 0.02em; color: rgba(26,26,26,0.5); margin-top: 12px; }
+  .sub  { font-size: 12px; line-height: 1.5; color: rgba(26,26,26,0.45); margin-top: 8px; }
+
+  .btn-primary {
+    border: none; cursor: pointer; border-radius: 999px;
+    background: var(--fg); color: var(--bg);
+    padding: 10px 20px; font-size: 13px; font-family: inherit;
+    transition: background .15s ease;
+  }
+  .btn-primary:hover { background: rgba(26,26,26,0.85); }
+
+  .chip {
+    border: none; cursor: pointer; border-radius: 999px;
+    background: rgba(26,26,26,0.06); color: rgba(26,26,26,0.7);
+    padding: 5px 12px; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+    font-family: inherit; transition: background .15s ease; margin-top: 12px;
+  }
+  .chip:hover { background: rgba(26,26,26,0.11); }
+
+  .swatches { display: flex; gap: 8px; }
+  .swatches input[type="color"] {
+    -webkit-appearance: none; appearance: none;
+    width: 36px; height: 36px; border-radius: 8px; padding: 0; cursor: pointer;
+    background: transparent; border: none; outline: none;
+  }
+  .swatches input[type="color"]:focus, .swatches input[type="color"]:focus-visible { outline: none; }
+  .swatches input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .swatches input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
+  .swatches input[type="color"]::-moz-color-swatch { border: none; border-radius: 8px; }
+
+  .field {
+    width: 100%; border: none; border-radius: 12px;
+    background: rgba(26,26,26,0.05); color: var(--fg);
+    padding: 10px 14px; font-size: 14px; font-family: inherit;
+    transition: background .15s ease;
+  }
+  .field:focus { outline: none; background: rgba(26,26,26,0.08); }
+  .field::placeholder { color: rgba(26,26,26,0.35); }
+
+  .range { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; margin-top: 4px; background: transparent; cursor: pointer; }
+  .range::-webkit-slider-runnable-track { height: 5px; border-radius: 999px; background: linear-gradient(to right, var(--fg) 0 var(--pct,33%), rgba(26,26,26,0.13) var(--pct,33%) 100%); }
+  .range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 15px; height: 15px; margin-top: -5px; border-radius: 999px; background: var(--fg); }
+  .range::-moz-range-track { height: 5px; border-radius: 999px; background: rgba(26,26,26,0.13); }
+  .range::-moz-range-progress { height: 5px; border-radius: 999px; background: var(--fg); }
+  .range::-moz-range-thumb { width: 15px; height: 15px; border: none; border-radius: 999px; background: var(--fg); }
+
+  /* ── stage ── */
+  .stage { position: relative; background: var(--surface-alt); border-radius: 24px; overflow: hidden; order: 1; padding: 20px; }
+  @media (min-width: 900px) { .stage { padding: 32px; order: 0; } }
+  .toolbar { position: absolute; top: 16px; right: 16px; z-index: 2; display: flex; gap: 8px; align-items: center; }
+  .tool-btn {
+    border: none; cursor: pointer; border-radius: 999px;
+    background: rgba(255,255,255,0.9); color: rgba(26,26,26,0.7);
+    padding: 7px 13px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: inherit; box-shadow: 0 1px 3px rgba(26,26,26,0.12);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    transition: background .15s ease, color .15s ease;
+  }
+  .tool-btn:hover { background: #fff; color: var(--fg); }
+  sizzle-reel { width: 100%; }
+
+  .segment { display: flex; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,0.9); box-shadow: 0 1px 3px rgba(26,26,26,0.12); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .seg-btn { border: none; cursor: pointer; background: transparent; color: rgba(26,26,26,0.55); padding: 7px 13px; font-family: inherit; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; transition: color .15s ease; }
+  .seg-btn.on { background: var(--fg); color: var(--bg); }
+
+  .timeline { margin-top: 16px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip-beat { border: none; cursor: pointer; border-radius: 999px; background: rgba(26,26,26,0.06); color: rgba(26,26,26,0.5); padding: 5px 10px; font-family: inherit; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 6px; transition: background .15s ease, color .15s ease; }
+  .chip-beat:hover { background: rgba(26,26,26,0.11); }
+  .chip-beat.on { background: var(--fg); color: var(--bg); }
+  .chip-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chip-note { margin-top: 10px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(26,26,26,0.45); }
+  .timeline-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; margin-top: 10px; }
+  .timeline-foot .chip-note { margin-top: 0; }
+  .credit { font-size: 11px; letter-spacing: 0.04em; color: rgba(26,26,26,0.4); text-decoration: none; white-space: nowrap; transition: color .15s ease; }
+  .credit:hover { color: rgba(26,26,26,0.72); }
+  .credit b { font-weight: 600; letter-spacing: 0.02em; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(12px);
+    background: var(--fg); color: var(--bg); padding: 10px 18px; border-radius: 999px;
+    font-size: 12px; letter-spacing: 0.02em; opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="bgReels" class="bg-reels" aria-hidden="true"></div>
+<div class="bg-scrim" aria-hidden="true"></div>
+<main class="app">
+  <div class="panels">
+    <!-- STAGE -->
+    <section class="stage">
+      <div class="toolbar">
+        <div class="segment">
+          <button id="liveBtn" class="seg-btn on">Live</button>
+          <button id="stillBtn" class="seg-btn">Still</button>
+        </div>
+        <button id="embedBtn" class="tool-btn" title="Copy the embed code for this reel">&lt;/&gt; Embed</button>
+      </div>
+      <sizzle-reel id="reel"
+        images="sample/1.jpg, sample/2.jpg, sample/3.jpg, sample/4.jpg, sample/5.jpg, sample/6.jpg, sample/7.jpg"
+        colors="#0AA7CA, #181B17, #776549, #F5EAE7, #8A8784"
+        headline="Faux Reel"
+        aspect="16 / 9"
+        radius="20px"
+        speed="1"></sizzle-reel>
+      <div class="timeline">
+        <div id="chips" class="chips"></div>
+        <div class="timeline-foot">
+          <p id="chipNote" class="chip-note">The chips follow the cut. Click one to freeze and replay that beat.</p>
+          <a class="credit" href="https://reckon.house" target="_blank" rel="noopener">by <b>Reckon House Staples</b></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- RAIL -->
+    <aside class="rail">
+      <div class="rail-head">
+        <h1>Faux Reel</h1>
+        <span class="tag">Lab</span>
+      </div>
+      <p class="lede">Load stills, pull a palette from their pixels, set a title. The reel cuts itself. Nothing uploads, nothing saves.</p>
+
+      <div class="ctl">
+        <span class="label"><b>01</b><span class="dash">—</span>Images</span>
+        <button id="loadBtn" class="btn-primary">Load images</button>
+        <input id="fileInput" type="file" accept="image/*" multiple hidden />
+        <p id="imgStatus" class="note">Running the sample set</p>
+        <p class="sub">Up to 8. They stay in your browser, a refresh clears them.</p>
+      </div>
+
+      <div class="ctl">
+        <span class="label"><b>02</b><span class="dash">—</span>Palette</span>
+        <div id="swatches" class="swatches"></div>
+        <button id="reextract" class="chip">Re-extract</button>
+      </div>
+
+      <div class="ctl">
+        <span class="label"><b>03</b><span class="dash">—</span>Title card</span>
+        <input id="headline" class="field" value="Faux Reel" placeholder="Leave empty for no title card" />
+        <p class="sub">1&ndash;2 words slide in. 3+ scatter through the cut, then build.</p>
+      </div>
+
+      <div class="ctl">
+        <span class="label"><b>04</b><span class="dash">—</span>Speed <span id="speedVal">&times; 1.00</span></span>
+        <input id="speed" class="range" type="range" min="0.5" max="2" step="0.05" value="1" />
+      </div>
+    </aside>
+  </div>
+</main>
+<div id="toast" class="toast">Embed code copied</div>
+
+<script type="module">
+  const DEFAULT_IMAGES = ["sample/1.jpg","sample/2.jpg","sample/3.jpg","sample/4.jpg","sample/5.jpg","sample/6.jpg","sample/7.jpg"];
+  const DEFAULT_COLORS = ["#0AA7CA","#181B17","#776549","#F5EAE7","#8A8784"];
+
+  const reel = document.getElementById("reel");
+  const swatchesEl = document.getElementById("swatches");
+  const headlineEl = document.getElementById("headline");
+  const speedEl = document.getElementById("speed");
+  const speedVal = document.getElementById("speedVal");
+  const imgStatus = document.getElementById("imgStatus");
+  const toast = document.getElementById("toast");
+  const objectUrls = [];
+
+  let images = [...DEFAULT_IMAGES];
+  let colors = [...DEFAULT_COLORS];
+
+  function syncReel() {
+    reel.setAttribute("images", images.join(", "));
+    reel.setAttribute("colors", colors.join(", "));
+    const hl = headlineEl.value.trim();
+    if (hl) reel.setAttribute("headline", hl); else reel.removeAttribute("headline");
+  }
+
+  function renderSwatches() {
+    swatchesEl.innerHTML = "";
+    colors.forEach((c, k) => {
+      const inp = document.createElement("input");
+      inp.type = "color";
+      inp.value = c;
+      inp.setAttribute("aria-label", `Palette color ${k + 1}`);
+      inp.addEventListener("input", () => { colors[k] = inp.value.toUpperCase(); syncReel(); });
+      swatchesEl.appendChild(inp);
+    });
+  }
+
+  // Canvas dominant-color extraction (same method the site uses). Runs on the
+  // user's own images (object URLs) or on the samples when this file is served;
+  // when opened via file:// the sample canvases are tainted, so it no-ops and
+  // the current palette stays.
+  async function extractPalette(srcs, count = 5) {
+    const buckets = new Map();
+    for (const src of srcs) {
+      await new Promise((resolve) => {
+        const im = new Image();
+        im.crossOrigin = "anonymous";
+        im.onload = () => {
+          const w = 64, h = Math.max(1, Math.round((im.naturalHeight / im.naturalWidth) * w));
+          const cv = document.createElement("canvas");
+          cv.width = w; cv.height = h;
+          const cx = cv.getContext("2d");
+          if (!cx) return resolve();
+          cx.drawImage(im, 0, 0, w, h);
+          let data;
+          try { data = cx.getImageData(0, 0, w, h).data; } catch { return resolve(); }
+          for (let p = 0; p < data.length; p += 4) {
+            const r = data[p], g = data[p + 1], b = data[p + 2];
+            const key = `${r >> 4},${g >> 4},${b >> 4}`;
+            const cur = buckets.get(key) || { n: 0, r: 0, g: 0, b: 0 };
+            cur.n++; cur.r += r; cur.g += g; cur.b += b;
+            buckets.set(key, cur);
+          }
+          resolve();
+        };
+        im.onerror = () => resolve();
+        im.src = src;
+      });
+    }
+    const total = [...buckets.values()].reduce((s, v) => s + v.n, 0) || 1;
+    const ranked = [...buckets.values()]
+      .map((v) => ({ n: v.n, r: Math.round(v.r / v.n), g: Math.round(v.g / v.n), b: Math.round(v.b / v.n) }))
+      .map((c) => {
+        const max = Math.max(c.r, c.g, c.b), min = Math.min(c.r, c.g, c.b);
+        const sat = max === 0 ? 0 : (max - min) / max;
+        const extreme = (c.r > 235 && c.g > 235 && c.b > 235) || (c.r < 20 && c.g < 20 && c.b < 20);
+        const w = extreme && c.n / total < 0.4 ? 0 : c.n * (1 + sat * 2.2);
+        return { ...c, w };
+      })
+      .filter((c) => c.w > 0)
+      .sort((a, b) => b.w - a.w);
+    const picks = [];
+    for (const c of ranked) {
+      if (picks.length >= count) break;
+      if (picks.every((p) => Math.hypot(p.r - c.r, p.g - c.g, p.b - c.b) > 60)) picks.push(c);
+    }
+    picks.sort((a, b) => {
+      const sat = (c) => { const max = Math.max(c.r, c.g, c.b); return max === 0 ? 0 : (max - Math.min(c.r, c.g, c.b)) / max; };
+      return sat(b) - sat(a);
+    });
+    const hex = (v) => v.toString(16).padStart(2, "0");
+    return picks.map((p) => `#${hex(p.r)}${hex(p.g)}${hex(p.b)}`.toUpperCase());
+  }
+
+  async function pullPalette(srcs, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "Reading pixels…"; }
+    const picked = await extractPalette(srcs, 5);
+    if (picked.length >= 3) { colors = picked; renderSwatches(); syncReel(); }
+    if (btn) { btn.disabled = false; btn.textContent = "Re-extract"; }
+  }
+
+  // Load images
+  document.getElementById("loadBtn").addEventListener("click", () => document.getElementById("fileInput").click());
+  document.getElementById("fileInput").addEventListener("change", (e) => {
+    const files = [...(e.target.files || [])].slice(0, 8);
+    if (!files.length) return;
+    objectUrls.forEach((u) => URL.revokeObjectURL(u));
+    objectUrls.length = 0;
+    images = files.map((f) => { const u = URL.createObjectURL(f); objectUrls.push(u); return u; });
+    imgStatus.textContent = `${images.length} of yours loaded`;
+    syncReel();
+    pullPalette(images);
+  });
+
+  // Re-extract
+  document.getElementById("reextract").addEventListener("click", (e) => pullPalette(images, e.currentTarget));
+
+  // Title
+  headlineEl.addEventListener("input", syncReel);
+
+  // Speed — label + fill live; reel speed on release (setting the attribute
+  // rebuilds the reel, so we avoid doing it on every drag tick).
+  function speedFill() {
+    const v = parseFloat(speedEl.value);
+    speedVal.innerHTML = "&times; " + v.toFixed(2);
+    speedEl.style.setProperty("--pct", `${((v - 0.5) / 1.5) * 100}%`);
+  }
+  speedEl.addEventListener("input", speedFill);
+  speedEl.addEventListener("change", () => reel.setAttribute("speed", parseFloat(speedEl.value).toFixed(2)));
+
+  // Copy embed
+  function buildEmbed() {
+    const imgs = images.map((u, i) => (/^blob:/.test(u) ? `image-${i + 1}.jpg` : u)).join(", ");
+    const hl = headlineEl.value.trim();
+    const sp = parseFloat(speedEl.value);
+    const lines = [
+      `<script src="sizzle-reel.js"><\/script>`,
+      `<sizzle-reel`,
+      `  images="${imgs}"`,
+      `  colors="${colors.join(", ")}"`,
+    ];
+    if (hl) lines.push(`  headline="${hl}"`);
+    if (sp !== 1) lines.push(`  speed="${sp.toFixed(2)}"`);
+    lines.push(`  aspect="16 / 9"`, `  radius="20px"`, `></sizzle-reel>`);
+    return lines.join("\n");
+  }
+  document.getElementById("embedBtn").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(buildEmbed()); } catch (_) {}
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 1600);
+  });
+
+  // ── beat timeline (reads the web component's beats + beat event) ──
+  const chipsEl = document.getElementById("chips");
+  const chipNote = document.getElementById("chipNote");
+  const liveBtn = document.getElementById("liveBtn");
+  const stillBtn = document.getElementById("stillBtn");
+  let liveBeat = 0, stepMode = false, lastSig = "";
+
+  function renderChips(beats) {
+    chipsEl.innerHTML = "";
+    beats.forEach((b, k) => {
+      const btn = document.createElement("button");
+      btn.className = "chip-beat";
+      if (b.color) {
+        const dot = document.createElement("i");
+        dot.className = "chip-dot";
+        dot.style.background = b.color;
+        btn.appendChild(dot);
+      }
+      btn.appendChild(document.createTextNode(`${k + 1} ${b.fx}`));
+      btn.addEventListener("click", () => { stepMode = true; setToggle(); reel.index = k; });
+      chipsEl.appendChild(btn);
+    });
+  }
+  function highlight(active) {
+    [...chipsEl.children].forEach((c, k) => c.classList.toggle("on", k === active));
+  }
+  function setToggle() {
+    liveBtn.classList.toggle("on", !stepMode);
+    stillBtn.classList.toggle("on", stepMode);
+    chipNote.textContent = stepMode
+      ? "Frozen. Hit Live to resume, or pick another chip to study its cut."
+      : "The chips follow the cut. Click one to freeze and replay that beat.";
+  }
+  reel.addEventListener("beat", (e) => {
+    const { index, beats } = e.detail;
+    const sig = beats.map((b) => b.fx).join(",") + ":" + beats.length;
+    if (sig !== lastSig) { lastSig = sig; renderChips(beats); stepMode = false; setToggle(); }
+    if (!stepMode) liveBeat = index;
+    highlight(index);
+  });
+  liveBtn.addEventListener("click", () => { stepMode = false; setToggle(); reel.index = null; });
+  stillBtn.addEventListener("click", () => { stepMode = true; setToggle(); reel.index = liveBeat; });
+  if (reel.beats && reel.beats.length) { lastSig = reel.beats.map((b) => b.fx).join(",") + ":" + reel.beats.length; renderChips(reel.beats); }
+
+  // ── background: a wall of tiny reels, each with its own offset, speed, and
+  // shuffled image order, so the field never falls into lockstep. Purely
+  // decorative and independent of the controls — the stage reel is the one
+  // that answers to you. CSS hides all of this for prefers-reduced-motion.
+  const bgReels = document.getElementById("bgReels");
+  const shuffled = (a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+  // Smaller tiles, spaced out, at the site's 23% squircle radius — the field
+  // reads like the reckon.house homepage scatter, not an edge-to-edge wall.
+  const BG_TILE = 150, BG_GAP = 48, BG_MAXCOLS = 5, BG_CAP = 20;
+  const bgColCount = () => Math.min(BG_MAXCOLS, Math.max(2, Math.floor((window.innerWidth - BG_GAP) / (BG_TILE + BG_GAP))));
+  let bgCols = 0;
+  function fillBackground() {
+    const cols = bgColCount();
+    let rows = Math.max(2, Math.floor((window.innerHeight - BG_GAP) / (BG_TILE + BG_GAP)));
+    rows = Math.max(2, Math.min(rows, Math.floor(BG_CAP / cols))); // full rows only, count <= CAP
+    bgCols = cols;
+    bgReels.style.gridTemplateColumns = `repeat(${cols}, ${BG_TILE}px)`;
+    bgReels.style.gridAutoRows = `${BG_TILE}px`;
+    bgReels.classList.remove("in");
+    bgReels.innerHTML = "";
+    for (let n = 0; n < cols * rows; n++) {
+      const t = document.createElement("sizzle-reel");
+      t.setAttribute("images", shuffled(DEFAULT_IMAGES).join(", "));
+      t.setAttribute("colors", DEFAULT_COLORS.join(", "));
+      t.setAttribute("aspect", "1 / 1");
+      t.setAttribute("radius", "23%");        // matches the site's thumb-card squircle
+      t.setAttribute("speed", (0.7 + Math.random() * 0.9).toFixed(2));
+      t.setAttribute("offset", String(Math.floor(Math.random() * 24)));
+      bgReels.appendChild(t);
+    }
+    requestAnimationFrame(() => bgReels.classList.add("in"));
+  }
+  fillBackground();
+  // Rebuild only when the column count actually changes, so a stray resize
+  // tick doesn't reshuffle the whole wall.
+  let rzTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => { if (bgColCount() !== bgCols) fillBackground(); }, 260);
+  });
+
+  // init
+  renderSwatches();
+  speedFill();
+</script>
+</body>
+</html>
