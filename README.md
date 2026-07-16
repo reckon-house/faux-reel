@@ -8,7 +8,7 @@ Drop it in a pitch deck, a portfolio, a landing page. Anywhere a still could use
 energy of a video, without shooting, editing, or hosting one. If you are a developer
 or product manager who wants that without a motion designer on call, it is built for you.
 
-<!-- demo.gif — animated capture of the reel goes here (generate via export/) -->
+![Faux Reel cutting a stack of stills into motion](demo.gif)
 
 Made by [Reckon House Staples](https://reckon.house). The full story:
 [reckon.house/case-studies/sizzle](https://reckon.house/case-studies/sizzle).
