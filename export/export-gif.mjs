@@ -1,33 +1,69 @@
 #!/usr/bin/env node
-// Export the SizzleReel loop as a seamless animated GIF (+ MP4).
+// Export a Faux Reel loop as a seamless animated GIF (+ MP4), fully local.
 //
-// Captures /sizzle/capture from a running dev server using the installed
-// Google Chrome via playwright-core, stepping CDP VIRTUAL TIME so every
-// frame lands on an exact tick — no wall-clock jitter, and the last frame
-// butts perfectly against the first for a seamless loop.
+// Spins up a throwaway static server for THIS repo, opens capture.html in the
+// installed Google Chrome via playwright-core, and records one loop off a CDP
+// screencast, snapping frames to an exact fps grid so the last frame butts
+// against the first (a seamless loop). No dev server, no remote site.
+//
+// Requires: Node 18+, Google Chrome, ffmpeg on PATH, and `npm install` in this
+// folder (pulls playwright-core, which drives your existing Chrome).
 //
 // Usage:
-//   node scripts/export-sizzle-gif.mjs [--port 59201] [--width 720] [--fps 20]
+//   npm install                                  # once
+//   node export-gif.mjs [--width 720] [--fps 20] [--out faux-reel]
+//                       [--headline "Title"] [--images "a.jpg, b.jpg"]
+//                       [--colors "#0AA7CA, #181B17"] [--speed 1]
+//   No --images uses the bundled sample/ set.
 //
-// Output: exports/ivy-park-sizzle.gif / .mp4 / -small.gif
+// Output: exports/faux-reel.gif, -small.gif, .mp4
 
 import { chromium } from "playwright-core";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, existsSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { createServer } from "node:http";
+import { mkdirSync, rmSync, existsSync, statSync, writeFileSync, readFileSync } from "node:fs";
+import { join, extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > -1 ? process.argv[i + 1] : dflt;
 };
 
-const PORT = arg("port", "59201");
 const WIDTH = parseInt(arg("width", "720"), 10);
 const HEIGHT = Math.round((WIDTH * 9) / 16);
 const FPS = parseInt(arg("fps", "20"), 10);
 const FRAME_MS = 1000 / FPS;
-const NAME = arg("out", "west-texas-sizzle");
-const URL = `http://localhost:${PORT}/sizzle/capture`;
+const NAME = arg("out", "faux-reel");
+
+// Serve THIS repo over a throwaway local port so the whole export runs offline.
+// capture.html, sizzle-reel.js and sample/ all live at the repo root, one level up.
+const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
+const MIME = {
+  ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript",
+  ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
+  ".gif": "image/gif", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json",
+};
+const server = createServer((req, res) => {
+  const path = decodeURIComponent(req.url.split("?")[0]);
+  const file = join(ROOT, path === "/" ? "capture.html" : path);
+  if (!file.startsWith(ROOT) || !existsSync(file) || !statSync(file).isFile()) {
+    res.writeHead(404); res.end("not found"); return;
+  }
+  res.writeHead(200, { "content-type": MIME[extname(file).toLowerCase()] || "application/octet-stream" });
+  res.end(readFileSync(file));
+});
+await new Promise((r) => server.listen(0, "127.0.0.1", r));
+const PORT = server.address().port;
+
+// Reel config passes straight through to capture.html (all optional; it falls
+// back to the bundled sample set).
+const query = new URLSearchParams();
+for (const key of ["images", "colors", "headline", "speed"]) {
+  const v = arg(key, null);
+  if (v !== null) query.set(key, v);
+}
+const PAGE_URL = `http://localhost:${PORT}/capture.html${query.toString() ? "?" + query : ""}`;
 
 const OUT_DIR = "exports";
 const TMP = join(OUT_DIR, ".frames");
@@ -49,8 +85,8 @@ try {
   });
   const cdp = await page.context().newCDPSession(page);
 
-  log(`→ ${URL} @ ${WIDTH}x${HEIGHT}`);
-  await page.goto(URL, { waitUntil: "networkidle" });
+  log(`→ ${PAGE_URL} @ ${WIDTH}x${HEIGHT}`);
+  await page.goto(PAGE_URL, { waitUntil: "networkidle" });
   await page.waitForFunction("window.__ready === true", null, { timeout: 30000 });
 
   const loopMs = await page.evaluate("window.__loopMs");
@@ -149,3 +185,5 @@ for (const f of [gif, gifSmall, mp4]) {
     log(`✓ ${f}  ${mb} MB`);
   }
 }
+
+server.close();

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Faux Reel — capture surface</title>
+<script src="sizzle-reel.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0E0E0E; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  sizzle-reel { width: 100vw; height: 100vh; display: block; }
+</style>
+</head>
+<body>
+<!--
+  Headless capture surface for export/export-gif.mjs. Renders ONE full-viewport
+  <sizzle-reel> and exposes the globals the exporter records against:
+    window.__ready     true once the reel is live and safe to record
+    window.__beat      current beat index
+    window.__beatCount total beat transitions (fresh-loop detection)
+    window.__loopMs    one full loop in ms
+  Reel config is optional, via query params (falls back to the sample set):
+    ?headline=Faux%20Reel&images=a.jpg,b.jpg&colors=%230AA7CA,%23181B17&speed=1
+-->
+<sizzle-reel id="r"
+  images="sample/1.jpg, sample/2.jpg, sample/3.jpg, sample/4.jpg, sample/5.jpg, sample/6.jpg, sample/7.jpg"
+  colors="#0AA7CA, #181B17, #776549, #F5EAE7, #8A8784"
+  headline="Faux Reel"
+  aspect="16 / 9"
+  radius="0"
+  speed="1"></sizzle-reel>
+<script>
+  const r = document.getElementById("r");
+  const q = new URLSearchParams(location.search);
+  // Override the inline defaults only where a param is given.
+  if (q.has("images")) r.setAttribute("images", q.get("images"));
+  if (q.has("colors")) r.setAttribute("colors", q.get("colors"));
+  if (q.has("headline")) r.setAttribute("headline", q.get("headline"));
+  if (q.has("speed")) r.setAttribute("speed", q.get("speed"));
+
+  const images = (r.getAttribute("images") || "").split(",").map((s) => s.trim()).filter(Boolean);
+
+  function hook() {
+    const beats = r.beats;
+    if (!beats || !beats.length) { return requestAnimationFrame(hook); }
+    window.__loopMs = beats.reduce((s, b) => s + b.ms, 0);
+    window.__beatCount = 0;
+    r.addEventListener("beat", function (e) {
+      window.__beat = e.detail.index;
+      window.__beatCount = (window.__beatCount || 0) + 1;
+      window.__ready = true;
+    });
+    window.__beat = r.index || 0;
+    window.__ready = true;
+  }
+  // Decode images + fonts before the recorder starts, so the loop opens clean.
+  Promise.all([
+    document.fonts.ready,
+    ...images.map((s) => new Promise((res) => { const i = new Image(); i.onload = res; i.onerror = res; i.src = s; })),
+  ]).then(hook);
+</script>
+</body>
+</html>

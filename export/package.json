@@ -1,0 +1,13 @@
+{
+  "name": "faux-reel-export",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Export a Faux Reel loop to GIF + MP4, fully local.",
+  "scripts": {
+    "export": "node export-gif.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.44.0"
+  }
+}
