@@ -185,7 +185,7 @@
       <div class="timeline">
         <div id="chips" class="chips"></div>
         <div class="timeline-foot">
-          <p id="chipNote" class="chip-note">The chips follow the cut. Click one to freeze and replay that beat.</p>
+          <p id="chipNote" class="chip-note">The highlighted chip is the current beat. Click one to freeze it.</p>
           <a class="credit" href="https://reckon.house" target="_blank" rel="noopener">by <b>Reckon House Staples</b></a>
         </div>
       </div>
@@ -408,8 +408,8 @@
     liveBtn.classList.toggle("on", !stepMode);
     stillBtn.classList.toggle("on", stepMode);
     chipNote.textContent = stepMode
-      ? "Frozen. Hit Live to resume, or pick another chip to study its cut."
-      : "The chips follow the cut. Click one to freeze and replay that beat.";
+      ? "Frozen. Click Live to resume, or pick another chip."
+      : "The highlighted chip is the current beat. Click one to freeze it.";
   }
   reel.addEventListener("beat", (e) => {
     const { index, beats } = e.detail;
