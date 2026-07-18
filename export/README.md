@@ -39,13 +39,24 @@ photos anywhere in the repo folder and point `--images` at them.
 
 | Flag | Default | What it does |
 |------|---------|--------------|
-| `--width` | `720` | Output width in px (height is 16:9) |
+| `--width` | `720` | Output width in px (height follows `--aspect`) |
+| `--aspect` | `16:9` | Aspect ratio `W:H` — `16:9`, `1:1`, `4:5`, `9:16` |
 | `--fps` | `20` | Frames per second |
 | `--out` | `faux-reel` | Output filename stem |
 | `--headline` | `Faux Reel` | Title-card text |
 | `--images` | sample set | Comma-separated image paths |
 | `--colors` | brand set | Comma-separated hex colors |
 | `--speed` | `1` | Playback speed |
+
+### Shapes for social
+
+`--aspect` gives you the right file for each platform:
+
+```bash
+node export-gif.mjs --aspect 1:1     # square — LinkedIn / Instagram feed
+node export-gif.mjs --aspect 4:5     # portrait — more feed height
+node export-gif.mjs --aspect 9:16    # vertical — Stories / Reels / TikTok
+```
 
 ## How it works
 

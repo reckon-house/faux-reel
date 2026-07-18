@@ -11,10 +11,11 @@
 //
 // Usage:
 //   npm install                                  # once
-//   node export-gif.mjs [--width 720] [--fps 20] [--out faux-reel]
+//   node export-gif.mjs [--width 720] [--fps 20] [--out faux-reel] [--aspect 16:9]
 //                       [--headline "Title"] [--images "a.jpg, b.jpg"]
 //                       [--colors "#0AA7CA, #181B17"] [--speed 1]
-//   No --images uses the bundled sample/ set.
+//   --aspect takes W:H — 16:9 (default), 1:1, 4:5, 9:16. No --images uses the
+//   bundled sample/ set.
 //
 // Output: exports/faux-reel.gif, -small.gif, .mp4
 
@@ -31,7 +32,9 @@ const arg = (name, dflt) => {
 };
 
 const WIDTH = parseInt(arg("width", "720"), 10);
-const HEIGHT = Math.round((WIDTH * 9) / 16);
+const ASPECT = arg("aspect", "16:9");                     // W:H — e.g. 1:1, 4:5, 9:16
+const [AW, AH] = ASPECT.split(":").map((n) => parseInt(n, 10) || 1);
+const HEIGHT = Math.round(WIDTH * (AH / AW));
 const FPS = parseInt(arg("fps", "20"), 10);
 const FRAME_MS = 1000 / FPS;
 const NAME = arg("out", "faux-reel");
@@ -63,6 +66,7 @@ for (const key of ["images", "colors", "headline", "speed"]) {
   const v = arg(key, null);
   if (v !== null) query.set(key, v);
 }
+query.set("aspect", `${AW} / ${AH}`);   // capture.html sizes the reel to match the viewport
 const PAGE_URL = `http://localhost:${PORT}/capture.html${query.toString() ? "?" + query : ""}`;
 
 const OUT_DIR = "exports";

@@ -36,6 +36,7 @@
   if (q.has("colors")) r.setAttribute("colors", q.get("colors"));
   if (q.has("headline")) r.setAttribute("headline", q.get("headline"));
   if (q.has("speed")) r.setAttribute("speed", q.get("speed"));
+  if (q.has("aspect")) r.setAttribute("aspect", q.get("aspect"));
 
   const images = (r.getAttribute("images") || "").split(",").map((s) => s.trim()).filter(Boolean);
 
