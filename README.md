@@ -17,8 +17,8 @@ Made by [Reckon House Staples](https://reckon.house). The full story:
 
 ## Why I made this
 
-I never had the patience to properly learn video editing, not even the small stuff.
-But I kept wanting quick sizzle clips: an intro card, a social reel, a little motion
+I wanted that look, just not the editing behind it.
+Quick sizzle clips kept coming up: an intro card, a social reel, a little motion
 for product marketing, a project thumbnail. So I built the simplest thing that could
 partially fake it. A stack of stills, cut fast enough to read as motion, with no
 timeline and nothing to render.
